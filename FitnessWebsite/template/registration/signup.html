@@ -1,10 +1,13 @@
 {% extends 'plans/base.html' %}
 {% block content %}
 <div class="container">
-<h2>Sign up</h2>
-  <form method="post">
+<h2>Sign up</h2><br>
+{% if error %} <h3 style="color: red;"> {{error}} </h3> {%endif%}
+  <form method="POST" action="{% url 'register'%}">
     {% csrf_token %}
-    {{ form.as_p }}
+    <input type="text" minlength="6" name="username" id="username" placeholder="Username" required><br><br>
+    <input type="email" name="email" id="email" placeholder="Email" required><br><br>
+    <input type="password" minlength="6" name="password" id="password" placeholder="Password" required><br><br>
     <button type="submit">Sign up</button>
   </form>
 </div>
