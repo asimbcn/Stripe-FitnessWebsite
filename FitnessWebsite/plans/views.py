@@ -1,13 +1,28 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.models import User
-from .models import FitnessPlan
+from .models import FitnessPlan, Customer
 from django.contrib import auth
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 import stripe
+from django.http import HttpResponse
 
 stripe.api_key = 'sk_test_51HJhEkBx0yfTfeVyNBVW5NYtn79kqjLrfFCZYtTyTjrR6kYz779aGWoVocUR65kZf8WATnuHagDLGuzBwLsJp3jA00XIuOU2OB'
 
 # Create your views here.
+@user_passes_test(lambda u: u.is_superuser)
+def updateaccount(request):
+    customers = Customer.objects.all()
+    for customer in customers:
+        subscription = stripe.Subscription.retrieve(customer.stripe_subscription_id)
+        if subscription.status != 'active':
+            customer.membership = False
+        else:
+            customer.membership = True
+        customer.cancel_at_period_end = subscription.cancel_at_period_end
+        customer.save() 
+        return HttpResponse('Action Completed')       
+
+
 def login(request):
     if request.method == 'POST':
         user = auth.authenticate(username=request.POST['username'],password=request.POST['password'])
@@ -58,6 +73,12 @@ def join(request):
 def plan(request,pk):
     plan = get_object_or_404(FitnessPlan, pk=pk)
     if plan.premium :
+        if request.user.is_authenticated:
+            try:
+                if request.user.customer.membership:
+                    return render(request, 'plans/plan.html', {'plan':plan})
+            except Customer.DoesNotExist:
+                return redirect('join')
         return redirect('join')
     else:
         return render(request, 'plans/plan.html', {'plan':plan})
@@ -65,9 +86,39 @@ def plan(request,pk):
 @login_required(login_url='login')
 def checkout(request):
 
+    try:
+        if request.user.customer.membership:
+            return redirect('setting')
+    except Customer.DoesNotExist:
+        pass
+
     coupons = {'newyear':20, 'dashain':20, 'tihar':20, 'anniversary':30}
 
     if request.method == 'POST':
+        stripe_customer = stripe.Customer.create(email=request.user.email, source=request.POST['stripeToken'])
+        plan = 'price_1HK3n0Bx0yfTfeVyV4boDCRh'
+        if request.POST['plan'] == 'yearly':
+            plan = 'price_1HK3n0Bx0yfTfeVyf3wJnzk5'
+        if request.POST['coupon'] in coupons:
+            percentage = coupons[request.POST['coupon'].lower()]
+            try:
+                coupon = stripe.Coupon.create(duration='once', id=request.POST['coupon'].lower(),
+                percent_off=percentage)  
+            except:
+                pass
+            subscription = stripe.Subscription.create(customer=stripe_customer.id,
+            items=[{'plan':plan}], coupon = request.POST['coupon'].lower())
+        else:
+            subscription = stripe.Subscription.create(customer=stripe_customer.id,
+            items=[{'plan':plan}])
+
+        customer = Customer()
+        customer.user = request.user
+        customer.stripe_id = stripe_customer.id
+        customer.membership = True
+        customer.cancel_at_period_end = False
+        customer.stripe_subscription_id = subscription.id
+        customer.save()    
         return redirect('home')
     else:    
         plan = 'monthly'
@@ -97,7 +148,25 @@ def checkout(request):
 
 @login_required(login_url='login')
 def setting(request):
-    return render(request, 'registration/settings.html') 
+    membership = False
+    cancel_at_period_end = False
+    if request.method == 'POST':
+        subscription = stripe.Subscription.retrieve(request.user.customer.stripe_subscription_id)
+        subscription.cancel_at_period_end = True
+        request.user.customer.cancel_at_period_end = True
+        cancel_at_period_end = True
+        subscription.save()
+        request.user.customer.save()
+    else:
+        try:
+            if request.user.customer.membership:
+                membership = True
+            if request.user.customer.cancel_at_period_end:
+                cancel_at_period_end = True
+        except Customer.DoesNotExist:
+            membership = False                
+    return render(request, 'registration/settings.html',{'membership':membership,
+    'cancel_at_period_end':cancel_at_period_end}) 
 
 @login_required(login_url='login')
 def logout(request):

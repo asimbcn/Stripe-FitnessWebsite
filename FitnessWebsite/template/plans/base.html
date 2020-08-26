@@ -19,6 +19,9 @@
       <nav class="my-2 my-md-0 mr-md-3">
         <a class="p-2 text-dark" href="{% url 'join'%}">Premium</a>
         {% if user.is_authenticated %}
+        {% if user.is_superuser%}
+        <a class="p-2 text-dark" href="{% url 'updateaccount'%}">Update Info</a>
+        {%endif%}
         <a class="p-2 text-dark" href="{% url 'setting'%}">Settings</a>
         <a class="p-2 text-dark" href="{% url 'logout'%}">Log Out</a>
         {% else %}

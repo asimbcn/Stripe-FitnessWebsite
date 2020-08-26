@@ -11,4 +11,5 @@ urlpatterns = [
     path('plans/<int:pk>',views.plan, name='plan'),
     path('checkout/', views.checkout, name='checkout'),
     path('settings/',views.setting,name='setting'),
+    path('updateaccount/',views.updateaccount,name='updateaccount'),
 ]
