@@ -1,2 +1,2 @@
-<h1>PORTFOLIO - DJANGO</h1>
+<h1>Fitness Website - Stripe Payment - DJANGO</h1>
 <p>-----------------------</p>
